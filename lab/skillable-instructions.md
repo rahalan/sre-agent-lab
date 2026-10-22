@@ -637,7 +637,7 @@ Everything below was configured automatically when you ran `azd up`:
 - [] Managed Identity with Reader + Monitoring Reader + Log Analytics Reader RBAC (Bicep)
 - [] Log Analytics Workspace + Application Insights (Bicep)
 - [] Grubify Container App with external ingress (Bicep)
-- [] Azure Monitor alert rules — HTTP 5xx metric + error log alerts (Bicep)
+- [] Azure Monitor HTTP 5xx metric alert — >5 errors in 5 minutes (Bicep)
 - [] Knowledge base files uploaded (post-provision script)
 - [] Incident handler subagent created (post-provision script)
 - [] Incident response plan created (post-provision script)

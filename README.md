@@ -103,7 +103,7 @@ Deployment takes ~8-12 minutes.
 | Grubify Frontend | Azure Container Apps | Sample app UI | |
 | Log Analytics | `Microsoft.OperationalInsights` | Log storage for KQL queries | [Azure Observability](https://sre.azure.com/docs/capabilities/diagnose-azure-observability) |
 | App Insights | `Microsoft.Insights` | Request tracing and exceptions | |
-| Alert Rules | `Microsoft.Insights/metricAlerts` | HTTP 5xx and error log alerts | |
+| Alert Rules | `Microsoft.Insights/metricAlerts` | HTTP 5xx alert (>5 errors in 5 minutes) | |
 | Managed Identity | `Microsoft.ManagedIdentity` | Agent identity for Azure access | [Permissions](https://sre.azure.com/docs/tutorials/agent-config/manage-permissions) |
 | Container Registry | `Microsoft.ContainerRegistry` | Grubify container images | |
 
@@ -154,6 +154,9 @@ set PATH=%PATH%;C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python312
 
 If the script deploys images but the app still shows the default page:
 
+These commands update image references only; both images must already have been
+built and pushed to the registry. Run them in Windows Command Prompt, not PowerShell.
+
 ```cmd
 for /f "tokens=*" %a in ('azd env get-value AZURE_CONTAINER_REGISTRY_NAME') do set ACR=%a
 for /f "tokens=*" %a in ('azd env get-value CONTAINER_APP_NAME') do set APP=%a
@@ -163,6 +166,29 @@ az containerapp update --name %FE% --resource-group rg-sre-lab --image %ACR%.azu
 ```
 
 ## Verify Setup
+
+### API telemetry and browser access
+
+The API source in `src/grubify/GrubifyApi` uses Azure Monitor OpenTelemetry when
+`APPLICATIONINSIGHTS_CONNECTION_STRING` is configured. Bicep supplies it through a
+Container App secret reference and allows the deployed frontend origin through
+`AllowedOrigins__2`. Local development without the connection string does not
+enable the Azure Monitor exporter. Rebuild the API image after changing its
+source; setting the connection string alone does not instrument an older image.
+
+After requesting `/api/restaurants`, verify request telemetry in Application
+Insights using the resource name, not its application ID when specifying a
+resource group:
+
+```cmd
+az monitor app-insights query --app <application-insights-name> --resource-group <resource-group> --analytics-query "requests | where timestamp > ago(15m) | where url has '/api/restaurants' | project timestamp, name, resultCode, success, cloud_RoleName"
+```
+
+Allow a few minutes for ingestion. A successful API check should return five
+restaurants and an `Access-Control-Allow-Origin` header matching the frontend
+origin when the request includes that origin.
+
+### SRE agent configuration
 
 After deployment completes, open your agent at [sre.azure.com](https://sre.azure.com) and click **Full setup**. You should see green checkmarks on:
 

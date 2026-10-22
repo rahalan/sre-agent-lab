@@ -125,7 +125,7 @@ elif [ -n "$ACR_NAME" ]; then
       --image "grubify-api:latest" \
       --file "$PROJECT_DIR/src/grubify/GrubifyApi/Dockerfile" \
       "$PROJECT_DIR/src/grubify/GrubifyApi" \
-      --no-logs --output none 2>/dev/null
+      --output none || { echo "❌ API image build failed; stopping before deployment." >&2; exit 1; }
   else
     # Build directly from GitHub — no local clone needed
     az acr build \
@@ -133,7 +133,7 @@ elif [ -n "$ACR_NAME" ]; then
       --image "grubify-api:latest" \
       --file "Dockerfile" \
       "${GRUBIFY_REPO}#main:GrubifyApi" \
-      --no-logs --output none 2>/dev/null
+      --output none || { echo "❌ API image build failed; stopping before deployment." >&2; exit 1; }
   fi
 
   echo "   ✅ Built: ${IMAGE_TAG}"
@@ -144,7 +144,7 @@ elif [ -n "$ACR_NAME" ]; then
     --name "$CONTAINER_APP_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --image "$IMAGE_TAG" \
-    --output none 2>/dev/null
+    --output none || { echo "❌ API deployment failed." >&2; exit 1; }
 
   # Refresh the app URL after update (retry if empty — Windows Git Bash can be slow)
   FQDN=""
@@ -174,14 +174,14 @@ elif [ -n "$ACR_NAME" ]; then
       --image "grubify-frontend:latest" \
       --file "$PROJECT_DIR/src/grubify/grubify-frontend/Dockerfile" \
       "$PROJECT_DIR/src/grubify/grubify-frontend" \
-      --no-logs --output none 2>/dev/null
+      --output none || { echo "❌ Frontend image build failed; stopping before deployment." >&2; exit 1; }
   else
     az acr build \
       --registry "$ACR_NAME" \
       --image "grubify-frontend:latest" \
       --file "Dockerfile" \
       "${GRUBIFY_REPO}#main:grubify-frontend" \
-      --no-logs --output none 2>/dev/null
+      --output none || { echo "❌ Frontend image build failed; stopping before deployment." >&2; exit 1; }
   fi
 
   echo "   ✅ Frontend built"
@@ -191,7 +191,7 @@ elif [ -n "$ACR_NAME" ]; then
     --resource-group "$RESOURCE_GROUP" \
     --image "$FRONTEND_IMAGE" \
     --set-env-vars "REACT_APP_API_BASE_URL=https://${CONTAINER_APP_URL#https://}/api" \
-    --output none 2>/dev/null
+    --output none || { echo "❌ Frontend deployment failed." >&2; exit 1; }
 
   FE_FQDN=""
   for i in 1 2 3; do
@@ -357,7 +357,7 @@ for attempt in 1 2 3; do
     -X PUT "${AGENT_ENDPOINT}/api/v1/incidentPlayground/filters/grubify-http-errors" \
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
-    --data-binary '{"id":"grubify-http-errors","name":"Grubify HTTP Errors","priorities":["Sev0","Sev1","Sev2","Sev3","Sev4"],"titleContains":"","handlingAgent":"incident-handler","agentMode":"autonomous","maxAttempts":3}')
+    --data-binary '{"id":"grubify-http-errors","name":"Grubify HTTP Errors","priorities":["Sev0","Sev1","Sev2","Sev3","Sev4"],"titleContains":"","handlingAgent":"incident-handler","agentMode":"autonomous","maxAutomatedInvestigationAttempts":3}')
 
   if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "202" ] || [ "$HTTP_CODE" = "409" ]; then
     echo "   ✅ Response plan → incident-handler"
